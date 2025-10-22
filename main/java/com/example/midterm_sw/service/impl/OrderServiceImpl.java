@@ -3,16 +3,18 @@ package com.example.midterm_sw.service.impl;
 import com.example.midterm_sw.dto.OrderDto;
 import com.example.midterm_sw.dto.ProductDto;
 import com.example.midterm_sw.mapper.OrderMapper;
-import com.example.midterm_sw.mapper.ProductMapper;
 import com.example.midterm_sw.model.OrderStatus;
 import com.example.midterm_sw.model.Order;
 import com.example.midterm_sw.model.Product;
+import com.example.midterm_sw.model.User;
 import com.example.midterm_sw.repository.OrderRepository;
+import com.example.midterm_sw.repository.ProductRepository;
+import com.example.midterm_sw.repository.UserRepository;
 import com.example.midterm_sw.service.OrderService;
-import com.example.midterm_sw.service.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.Date;
 import java.util.List;
 
 @Service
@@ -20,8 +22,8 @@ import java.util.List;
 public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
     private final OrderMapper orderMapper;
-    private final ProductService productService;
-    private final ProductMapper productMapper;
+    private final UserRepository userRepository;
+    private final ProductRepository productRepository;
 
     @Override
     public List<OrderDto> getAllOrders() {
@@ -33,20 +35,33 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public OrderDto getOrderById(Long id) {
-        return orderMapper.toDto(orderRepository.findById(id).orElse(null));
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+        return orderMapper.toDto(order);
     }
 
     @Override
     public void addOrder(OrderDto dto) {
         Order order = orderMapper.toEntity(dto);
         if (order.getStatus() == null) order.setStatus(OrderStatus.CREATED);
+        if (order.getCreatedAt() == null) order.setCreatedAt(new Date());
+
+        if (dto.getUserId() != null) {
+            User user = userRepository.findById(dto.getUserId())
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            order.setUser(user);
+        }
+
         orderRepository.save(order);
     }
 
     @Override
     public void addProductToOrder(Long id, ProductDto dto) {
-        Order order = orderMapper.toEntity(getOrderById(id));
-        Product product = productMapper.toEntity(productService.getProductById(dto.getId()));
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
+        Product product = productRepository.findById(dto.getId())
+                .orElseThrow(() -> new RuntimeException("Product not found"));
 
         order.getProducts().add(product);
         orderRepository.save(order);
@@ -54,9 +69,16 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public void updateOrder(Long id, OrderDto dto) {
-        Order updatedOrder = orderMapper.toEntity(getOrderById(id));
+        Order updatedOrder = orderRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
         if (dto.getCreatedAt() != null) updatedOrder.setCreatedAt(dto.getCreatedAt());
         if (dto.getStatus() != null) updatedOrder.setStatus(dto.getStatus());
+        if (dto.getUserId() != null) {
+            User user = userRepository.findById(dto.getUserId())
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            updatedOrder.setUser(user);
+        }
         orderRepository.save(updatedOrder);
     }
 
